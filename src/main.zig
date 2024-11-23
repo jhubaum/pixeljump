@@ -18,14 +18,35 @@ const LAVENDER = ray.Color{ .r = 131, .g = 118, .b = 156, .a = 255 };
 const PINK = ray.Color{ .r = 255, .g = 119, .b = 168, .a = 255 };
 const LIGHT_PEACH = ray.Color{ .r = 255, .g = 204, .b = 170, .a = 255 };
 
+const Position = struct {
+    x: f32,
+    y: f32,
+    fn squared_distance(self: *const Position, x: f32, y: f32) f32 {
+        const x_dist = self.x - x;
+        const y_dist = self.y - y;
+        return x_dist * x_dist + y_dist * y_dist;
+    }
+};
+
+const Circle = struct {
+    center: Position,
+    radius: f32,
+
+    fn contains(self: *const Circle, x: f32, y: f32) bool {
+        return (self.radius * self.radius) > self.center.squared_distance(x, y);
+    }
+};
+
 fn render(x: f32, y: f32) ?ray.Color {
-    if (x > 0.3 and x < 0.4 and y > 0.1 and y < 0.4) {
+    const circle = Circle{ .center = Position{ .x = 10.0, .y = 20.0 }, .radius = 5.0 };
+    if (circle.contains(x, y)) {
         return WHITE;
     }
     return null;
 }
 
 pub fn main() !void {
+    ray.SetConfigFlags(ray.FLAG_WINDOW_RESIZABLE);
     ray.InitWindow(960, 540, "My Window Name");
     ray.SetTargetFPS(144);
     defer ray.CloseWindow();
@@ -34,15 +55,19 @@ pub fn main() !void {
         ray.BeginDrawing();
         ray.ClearBackground(DARK_GREY);
 
-        const width: usize = @intCast(ray.GetScreenWidth());
-        const height: usize = @intCast(ray.GetScreenHeight());
-        for (0..width) |x_val| {
+        const WIDTH_WORLD = 100.0;
+
+        const width_screen: usize = @intCast(ray.GetScreenWidth());
+        const height_screen: usize = @intCast(ray.GetScreenHeight());
+
+        const HEIGHT_WORLD = WIDTH_WORLD * (@as(f32, @floatFromInt(height_screen)) / @as(f32, @floatFromInt(width_screen)));
+        for (0..width_screen) |x_val| {
             const x: i32 = @intCast(x_val);
-            const x_ratio: f32 = @as(f32, @floatFromInt(x_val)) / @as(f32, @floatFromInt(width));
-            for (0..height) |y_val| {
+            const x_ratio: f32 = @as(f32, @floatFromInt(x_val)) / @as(f32, @floatFromInt(width_screen));
+            for (0..height_screen) |y_val| {
                 const y: i32 = @intCast(y_val);
-                const y_ratio: f32 = @as(f32, @floatFromInt(y_val)) / @as(f32, @floatFromInt(height));
-                if (render(x_ratio, y_ratio)) |col| {
+                const y_ratio: f32 = @as(f32, @floatFromInt(y_val)) / @as(f32, @floatFromInt(height_screen));
+                if (render(x_ratio * WIDTH_WORLD, (1.0 - y_ratio) * HEIGHT_WORLD)) |col| {
                     ray.DrawPixel(x, y, col);
                 }
             }
