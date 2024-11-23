@@ -37,8 +37,28 @@ const Circle = struct {
     }
 };
 
+const Capsule = struct {
+    root: Position,
+    height: f32,
+    radius: f32,
+    fn contains(self: *const Capsule, x: f32, y: f32) bool {
+        var y_new = y;
+        if (y < self.root.y) {
+            // Point is below capsule, keep it unchanged
+            y_new = y;
+        } else if (y > self.root.y + self.height) {
+            // Point is above capsule, recenter so that circle detection works
+            y_new = y - self.height;
+        } else {
+            // Point is somewhere in the middle. Simply align it with the root
+            y_new = self.root.y;
+        }
+        return (self.radius * self.radius) > self.root.squared_distance(x, y_new);
+    }
+};
+
 fn render(x: f32, y: f32) ?ray.Color {
-    const circle = Circle{ .center = Position{ .x = 10.0, .y = 20.0 }, .radius = 5.0 };
+    const circle = Capsule{ .root = Position{ .x = 10.0, .y = 20.0 }, .radius = 5.0, .height = 10.0 };
     if (circle.contains(x, y)) {
         return WHITE;
     }
