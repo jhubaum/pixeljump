@@ -59,6 +59,10 @@ const Capsule = struct {
     radius: f32,
     angle: f32 = 0.0,
 
+    fn anchor(self: *const Capsule) Position {
+        return Position{ .x = self.root.x + self.height * std.math.cos(self.angle), .y = self.root.y + self.height * std.math.sin(self.angle) };
+    }
+
     fn contains(self: *const Capsule, x: f32, y: f32) bool {
         var pos = Position{ .x = x, .y = y };
         const anchor_direction = Position{ .x = self.height * std.math.cos(self.angle), .y = self.height * std.math.sin(self.angle) };
@@ -74,10 +78,39 @@ const Capsule = struct {
     }
 };
 
-fn render(x: f32, y: f32, time: f32) ?ray.Color {
-    const DEG_PER_SECOND = 180;
-    const circle = Capsule{ .root = Position{ .x = 30.0, .y = 20.0 }, .radius = 5.0, .height = 10.0, .angle = @mod(time * DEG_PER_SECOND * std.math.pi / 180.0, 2 * std.math.pi) };
-    if (circle.contains(x, y)) {
+fn render_character(x: f32, y: f32) bool {
+    // TODO: Replace all these magic numbers by named constans
+    const pos = Position{ .x = 30.0, .y = 20.0 };
+    const height = 20.0;
+    const body = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.5 * height }, .radius = 1.0, .height = 0.5 * height, .angle = 0.5 * std.math.pi };
+    const head = Circle{ .center = Position{ .x = pos.x, .y = pos.y + height }, .radius = 3.0 };
+
+    const left_upper_arm = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.7 * height }, .radius = 0.5, .height = 5, .angle = -0.25 * std.math.pi };
+    const left_lower_arm = Capsule{ .root = left_upper_arm.anchor(), .radius = 0.5, .height = 5, .angle = 0.25 * std.math.pi };
+
+    const right_upper_arm = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.7 * height }, .radius = 0.5, .height = 5, .angle = 1.25 * std.math.pi };
+    const right_lower_arm = Capsule{ .root = right_upper_arm.anchor(), .radius = 0.5, .height = 5, .angle = 1.75 * std.math.pi };
+
+    const left_upper_leg = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.5 * height }, .radius = 0.5, .height = 5, .angle = -0.35 * std.math.pi };
+    const left_lower_leg = Capsule{ .root = left_upper_leg.anchor(), .radius = 0.5, .height = 5, .angle = 1.5 * std.math.pi };
+
+    const right_upper_leg = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.5 * height }, .radius = 0.5, .height = 5, .angle = 1.5 * std.math.pi };
+    const right_lower_leg = Capsule{ .root = right_upper_leg.anchor(), .radius = 0.5, .height = 5, .angle = 1.35 * std.math.pi };
+
+    return body.contains(x, y) or
+        head.contains(x, y) or
+        left_upper_arm.contains(x, y) or
+        left_lower_arm.contains(x, y) or
+        right_upper_arm.contains(x, y) or
+        right_lower_arm.contains(x, y) or
+        left_upper_leg.contains(x, y) or
+        left_lower_leg.contains(x, y) or
+        right_upper_leg.contains(x, y) or
+        right_lower_leg.contains(x, y);
+}
+
+fn render(x: f32, y: f32, _: f32) ?ray.Color {
+    if (render_character(x, y)) {
         return WHITE;
     }
     return null;
