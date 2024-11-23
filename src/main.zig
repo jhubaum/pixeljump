@@ -26,6 +26,22 @@ const Position = struct {
         const y_dist = self.y - y;
         return x_dist * x_dist + y_dist * y_dist;
     }
+
+    fn scalar_mult(self: *const Position, scalar: f32) Position {
+        return Position{ .x = self.x * scalar, .y = self.y * scalar };
+    }
+
+    fn magnitude_sqr(self: *const Position) f32 {
+        return self.x * self.x + self.y * self.y;
+    }
+
+    fn dot(self: *const Position, other: Position) f32 {
+        return self.x * other.x + self.y * other.y;
+    }
+
+    fn subtract_from(self: *const Position, other: Position) Position {
+        return Position{ .x = other.x - self.x, .y = other.y - self.y };
+    }
 };
 
 const Circle = struct {
@@ -41,24 +57,26 @@ const Capsule = struct {
     root: Position,
     height: f32,
     radius: f32,
+    angle: f32 = 0.0,
+
     fn contains(self: *const Capsule, x: f32, y: f32) bool {
-        var y_new = y;
-        if (y < self.root.y) {
-            // Point is below capsule, keep it unchanged
-            y_new = y;
-        } else if (y > self.root.y + self.height) {
-            // Point is above capsule, recenter so that circle detection works
-            y_new = y - self.height;
-        } else {
-            // Point is somewhere in the middle. Simply align it with the root
-            y_new = self.root.y;
+        var pos = Position{ .x = x, .y = y };
+        const anchor_direction = Position{ .x = self.height * std.math.cos(self.angle), .y = self.height * std.math.sin(self.angle) };
+        var projected = anchor_direction.dot(self.root.subtract_from(pos)) / anchor_direction.magnitude_sqr();
+
+        if (projected > 0.0) {
+            if (projected > 1.0) {
+                projected = 1.0;
+            }
+            pos = anchor_direction.scalar_mult(projected).subtract_from(pos);
         }
-        return (self.radius * self.radius) > self.root.squared_distance(x, y_new);
+        return (self.radius * self.radius) > self.root.squared_distance(pos.x, pos.y);
     }
 };
 
 fn render(x: f32, y: f32, time: f32) ?ray.Color {
-    const circle = Capsule{ .root = Position{ .x = 10.0 + 5.0 * std.math.sin(time), .y = 20.0 }, .radius = 5.0, .height = 10.0 };
+    const DEG_PER_SECOND = 180;
+    const circle = Capsule{ .root = Position{ .x = 30.0, .y = 20.0 }, .radius = 5.0, .height = 10.0, .angle = @mod(time * DEG_PER_SECOND * std.math.pi / 180.0, 2 * std.math.pi) };
     if (circle.contains(x, y)) {
         return WHITE;
     }
@@ -87,7 +105,8 @@ pub fn main() !void {
             for (0..height_screen) |y_val| {
                 const y: i32 = @intCast(y_val);
                 const y_ratio: f32 = @as(f32, @floatFromInt(y_val)) / @as(f32, @floatFromInt(height_screen));
-                if (render(x_ratio * WIDTH_WORLD, (1.0 - y_ratio) * HEIGHT_WORLD, @floatCast(ray.GetTime()))) |col| {
+                const time: f32 = @floatCast(ray.GetTime());
+                if (render(x_ratio * WIDTH_WORLD, (1.0 - y_ratio) * HEIGHT_WORLD, time)) |col| {
                     ray.DrawPixel(x, y, col);
                 }
             }
@@ -95,4 +114,12 @@ pub fn main() !void {
 
         ray.EndDrawing();
     }
+}
+
+test "capsule-angle-calculation" {
+    const capsule = Capsule{ .root = Position{ .x = 0.0, .y = 0.0 }, .radius = 5.0, .height = 10.0, .angle = 0.5 * std.math.pi };
+
+    try std.testing.expect(capsule.contains(0.0, 0.0));
+    try std.testing.expect(capsule.contains(0.5 * capsule.height * std.math.cos(capsule.angle), 0.5 * capsule.height * std.math.sin(capsule.angle)));
+    try std.testing.expect(capsule.contains(capsule.height * std.math.cos(capsule.angle), capsule.height * std.math.sin(capsule.angle)));
 }
