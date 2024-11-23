@@ -57,8 +57,8 @@ const Capsule = struct {
     }
 };
 
-fn render(x: f32, y: f32) ?ray.Color {
-    const circle = Capsule{ .root = Position{ .x = 10.0, .y = 20.0 }, .radius = 5.0, .height = 10.0 };
+fn render(x: f32, y: f32, time: f32) ?ray.Color {
+    const circle = Capsule{ .root = Position{ .x = 10.0 + 5.0 * std.math.sin(time), .y = 20.0 }, .radius = 5.0, .height = 10.0 };
     if (circle.contains(x, y)) {
         return WHITE;
     }
@@ -87,7 +87,7 @@ pub fn main() !void {
             for (0..height_screen) |y_val| {
                 const y: i32 = @intCast(y_val);
                 const y_ratio: f32 = @as(f32, @floatFromInt(y_val)) / @as(f32, @floatFromInt(height_screen));
-                if (render(x_ratio * WIDTH_WORLD, (1.0 - y_ratio) * HEIGHT_WORLD)) |col| {
+                if (render(x_ratio * WIDTH_WORLD, (1.0 - y_ratio) * HEIGHT_WORLD, @floatCast(ray.GetTime()))) |col| {
                     ray.DrawPixel(x, y, col);
                 }
             }
