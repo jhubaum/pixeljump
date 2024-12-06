@@ -42,32 +42,46 @@ const Position = struct {
     fn subtract_from(self: *const Position, other: Position) Position {
         return Position{ .x = other.x - self.x, .y = other.y - self.y };
     }
+
+    fn add(self: *Position, other: Position) void {
+        self.x += other.x;
+        self.y += other.y;
+    }
 };
 
 const World = struct {
     player_pos: Position,
+    player_faces_right: bool = true,
+    player_movement_speed: Position = Position{ .x = 0.0, .y = 0.0 },
     fn update(self: *World, dt: f32) void {
         const FALLING_SPEED = 30;
         const MOVEMENT_SPEED = 20;
         // Simulate falling
         if (self.player_pos.y > 0.0) {
-            self.player_pos.y -= FALLING_SPEED * dt;
-            if (self.player_pos.y <= 0.0) {
-                self.player_pos.y = 0.0;
-            }
+            self.player_movement_speed.y -= FALLING_SPEED * dt;
+        } else if (ray.IsKeyPressed(ray.KEY_SPACE)) {
+            // On the ground and jumping
+            const JUMPING_SPEED = 7;
+            self.player_movement_speed.y += JUMPING_SPEED;
         }
 
-        var dx: f32 = 0.0;
+        self.player_movement_speed.x = 0.0;
         if (ray.IsKeyDown(ray.KEY_A) or ray.IsKeyDown(ray.KEY_LEFT)) {
-            dx = -1.0;
+            self.player_movement_speed.x = -dt * MOVEMENT_SPEED;
+            self.player_faces_right = false;
         } else if (ray.IsKeyDown(ray.KEY_S) or ray.IsKeyDown(ray.KEY_RIGHT)) {
-            dx = 1.0;
+            self.player_movement_speed.x = dt * MOVEMENT_SPEED;
+            self.player_faces_right = true;
         }
-        self.player_pos.x += dx * dt * MOVEMENT_SPEED;
+        self.player_pos.add(self.player_movement_speed);
+        if (self.player_pos.y < 0.0) {
+            self.player_pos.y = 0.0;
+            self.player_movement_speed.y = 0.0;
+        }
     }
 
     fn render_pixel(self: *const World, x: f32, y: f32) ?ray.Color {
-        if (render_character(self.player_pos, x, y)) {
+        if (render_character(self.player_pos, x, y, !self.player_faces_right)) {
             return WHITE;
         }
         return null;
@@ -108,23 +122,30 @@ const Capsule = struct {
     }
 };
 
-fn render_character(pos: Position, x: f32, y: f32) bool {
+fn angle_base(base: f32, invert: bool) f32 {
+    if (invert) {
+        return 1 - base;
+    }
+    return base;
+}
+
+fn render_character(pos: Position, x: f32, y: f32, invert: bool) bool {
     // TODO: Replace all these magic numbers by named constans
     const height = 20.0;
     const body = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.5 * height }, .radius = 1.0, .height = 0.5 * height, .angle = 0.5 * std.math.pi };
     const head = Circle{ .center = Position{ .x = pos.x, .y = pos.y + height }, .radius = 3.0 };
 
-    const left_upper_arm = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.7 * height }, .radius = 0.5, .height = 5, .angle = -0.25 * std.math.pi };
-    const left_lower_arm = Capsule{ .root = left_upper_arm.anchor(), .radius = 0.5, .height = 5, .angle = 0.25 * std.math.pi };
+    const left_upper_arm = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.7 * height }, .radius = 0.5, .height = 5, .angle = angle_base(-0.25, invert) * std.math.pi };
+    const left_lower_arm = Capsule{ .root = left_upper_arm.anchor(), .radius = 0.5, .height = 5, .angle = angle_base(0.25, invert) * std.math.pi };
 
-    const right_upper_arm = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.7 * height }, .radius = 0.5, .height = 5, .angle = 1.25 * std.math.pi };
-    const right_lower_arm = Capsule{ .root = right_upper_arm.anchor(), .radius = 0.5, .height = 5, .angle = 1.75 * std.math.pi };
+    const right_upper_arm = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.7 * height }, .radius = 0.5, .height = 5, .angle = angle_base(1.25, invert) * std.math.pi };
+    const right_lower_arm = Capsule{ .root = right_upper_arm.anchor(), .radius = 0.5, .height = 5, .angle = angle_base(1.75, invert) * std.math.pi };
 
-    const left_upper_leg = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.5 * height }, .radius = 0.5, .height = 5, .angle = -0.35 * std.math.pi };
-    const left_lower_leg = Capsule{ .root = left_upper_leg.anchor(), .radius = 0.5, .height = 5, .angle = 1.5 * std.math.pi };
+    const left_upper_leg = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.5 * height }, .radius = 0.5, .height = 5, .angle = angle_base(-0.35, invert) * std.math.pi };
+    const left_lower_leg = Capsule{ .root = left_upper_leg.anchor(), .radius = 0.5, .height = 5, .angle = angle_base(1.5, invert) * std.math.pi };
 
-    const right_upper_leg = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.5 * height }, .radius = 0.5, .height = 5, .angle = 1.5 * std.math.pi };
-    const right_lower_leg = Capsule{ .root = right_upper_leg.anchor(), .radius = 0.5, .height = 5, .angle = 1.35 * std.math.pi };
+    const right_upper_leg = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.5 * height }, .radius = 0.5, .height = 5, .angle = angle_base(1.5, invert) * std.math.pi };
+    const right_lower_leg = Capsule{ .root = right_upper_leg.anchor(), .radius = 0.5, .height = 5, .angle = angle_base(1.35, invert) * std.math.pi };
 
     return body.contains(x, y) or
         head.contains(x, y) or
