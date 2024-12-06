@@ -44,6 +44,36 @@ const Position = struct {
     }
 };
 
+const World = struct {
+    player_pos: Position,
+    fn update(self: *World, dt: f32) void {
+        const FALLING_SPEED = 30;
+        const MOVEMENT_SPEED = 20;
+        // Simulate falling
+        if (self.player_pos.y > 0.0) {
+            self.player_pos.y -= FALLING_SPEED * dt;
+            if (self.player_pos.y <= 0.0) {
+                self.player_pos.y = 0.0;
+            }
+        }
+
+        var dx: f32 = 0.0;
+        if (ray.IsKeyDown(ray.KEY_A) or ray.IsKeyDown(ray.KEY_LEFT)) {
+            dx = -1.0;
+        } else if (ray.IsKeyDown(ray.KEY_S) or ray.IsKeyDown(ray.KEY_RIGHT)) {
+            dx = 1.0;
+        }
+        self.player_pos.x += dx * dt * MOVEMENT_SPEED;
+    }
+
+    fn render(self: *const World, x: f32, y: f32) ?ray.Color {
+        if (render_character(self.player_pos, x, y)) {
+            return WHITE;
+        }
+        return null;
+    }
+};
+
 const Circle = struct {
     center: Position,
     radius: f32,
@@ -78,9 +108,8 @@ const Capsule = struct {
     }
 };
 
-fn render_character(x: f32, y: f32) bool {
+fn render_character(pos: Position, x: f32, y: f32) bool {
     // TODO: Replace all these magic numbers by named constans
-    const pos = Position{ .x = 30.0, .y = 20.0 };
     const height = 20.0;
     const body = Capsule{ .root = Position{ .x = pos.x, .y = pos.y + 0.5 * height }, .radius = 1.0, .height = 0.5 * height, .angle = 0.5 * std.math.pi };
     const head = Circle{ .center = Position{ .x = pos.x, .y = pos.y + height }, .radius = 3.0 };
@@ -109,18 +138,14 @@ fn render_character(x: f32, y: f32) bool {
         right_lower_leg.contains(x, y);
 }
 
-fn render(x: f32, y: f32, _: f32) ?ray.Color {
-    if (render_character(x, y)) {
-        return WHITE;
-    }
-    return null;
-}
-
 pub fn main() !void {
     ray.SetConfigFlags(ray.FLAG_WINDOW_RESIZABLE);
     ray.InitWindow(960, 540, "My Window Name");
     ray.SetTargetFPS(144);
     defer ray.CloseWindow();
+
+    const player_pos = Position{ .x = 30.0, .y = 20.0 };
+    var world = World{ .player_pos = player_pos };
 
     while (!ray.WindowShouldClose()) {
         ray.BeginDrawing();
@@ -131,6 +156,8 @@ pub fn main() !void {
         const width_screen: usize = @intCast(ray.GetScreenWidth());
         const height_screen: usize = @intCast(ray.GetScreenHeight());
 
+        world.update(@floatCast(ray.GetFrameTime()));
+
         const HEIGHT_WORLD = WIDTH_WORLD * (@as(f32, @floatFromInt(height_screen)) / @as(f32, @floatFromInt(width_screen)));
         for (0..width_screen) |x_val| {
             const x: i32 = @intCast(x_val);
@@ -138,8 +165,7 @@ pub fn main() !void {
             for (0..height_screen) |y_val| {
                 const y: i32 = @intCast(y_val);
                 const y_ratio: f32 = @as(f32, @floatFromInt(y_val)) / @as(f32, @floatFromInt(height_screen));
-                const time: f32 = @floatCast(ray.GetTime());
-                if (render(x_ratio * WIDTH_WORLD, (1.0 - y_ratio) * HEIGHT_WORLD, time)) |col| {
+                if (world.render(x_ratio * WIDTH_WORLD, (1.0 - y_ratio) * HEIGHT_WORLD)) |col| {
                     ray.DrawPixel(x, y, col);
                 }
             }
