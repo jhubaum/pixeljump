@@ -66,7 +66,7 @@ const World = struct {
         self.player_pos.x += dx * dt * MOVEMENT_SPEED;
     }
 
-    fn render(self: *const World, x: f32, y: f32) ?ray.Color {
+    fn render_pixel(self: *const World, x: f32, y: f32) ?ray.Color {
         if (render_character(self.player_pos, x, y)) {
             return WHITE;
         }
@@ -138,6 +138,30 @@ fn render_character(pos: Position, x: f32, y: f32) bool {
         right_lower_leg.contains(x, y);
 }
 
+fn render_world(world: *const World, screen_width: usize, screen_height: usize) void {
+    const VIRTUAL_PIXEL_SIZE = 5;
+
+    const WORLD_WIDTH = 100;
+    const screen_ratio = @as(f32, @floatFromInt(screen_height)) / @as(f32, @floatFromInt(screen_width));
+    const WORLD_HEIGHT = WORLD_WIDTH * screen_ratio;
+
+    for (0..(screen_width / VIRTUAL_PIXEL_SIZE)) |x_val| {
+        const x: i32 = @intCast(x_val);
+        const x_ratio = @as(f32, @floatFromInt(x)) / @as(f32, @floatFromInt(screen_width / VIRTUAL_PIXEL_SIZE));
+        for (0..(screen_height / VIRTUAL_PIXEL_SIZE)) |y_val| {
+            const y: i32 = @intCast(y_val);
+            const y_ratio: f32 = @as(f32, @floatFromInt(y_val)) / @as(f32, @floatFromInt(screen_height / VIRTUAL_PIXEL_SIZE));
+            if (world.render_pixel(x_ratio * WORLD_WIDTH, (1.0 - y_ratio) * WORLD_HEIGHT)) |col| {
+                for (0..VIRTUAL_PIXEL_SIZE) |dx| {
+                    for (0..VIRTUAL_PIXEL_SIZE) |dy| {
+                        ray.DrawPixel(x * VIRTUAL_PIXEL_SIZE + @as(i32, @intCast(dx)), y * VIRTUAL_PIXEL_SIZE + @as(i32, @intCast(dy)), col);
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub fn main() !void {
     ray.SetConfigFlags(ray.FLAG_WINDOW_RESIZABLE);
     ray.InitWindow(960, 540, "My Window Name");
@@ -151,25 +175,9 @@ pub fn main() !void {
         ray.BeginDrawing();
         ray.ClearBackground(DARK_GREY);
 
-        const WIDTH_WORLD = 100.0;
-
-        const width_screen: usize = @intCast(ray.GetScreenWidth());
-        const height_screen: usize = @intCast(ray.GetScreenHeight());
-
         world.update(@floatCast(ray.GetFrameTime()));
 
-        const HEIGHT_WORLD = WIDTH_WORLD * (@as(f32, @floatFromInt(height_screen)) / @as(f32, @floatFromInt(width_screen)));
-        for (0..width_screen) |x_val| {
-            const x: i32 = @intCast(x_val);
-            const x_ratio: f32 = @as(f32, @floatFromInt(x_val)) / @as(f32, @floatFromInt(width_screen));
-            for (0..height_screen) |y_val| {
-                const y: i32 = @intCast(y_val);
-                const y_ratio: f32 = @as(f32, @floatFromInt(y_val)) / @as(f32, @floatFromInt(height_screen));
-                if (world.render(x_ratio * WIDTH_WORLD, (1.0 - y_ratio) * HEIGHT_WORLD)) |col| {
-                    ray.DrawPixel(x, y, col);
-                }
-            }
-        }
+        render_world(&world, @intCast(ray.GetScreenWidth()), @intCast(ray.GetScreenHeight()));
 
         ray.EndDrawing();
     }
